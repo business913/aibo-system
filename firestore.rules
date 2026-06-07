@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── ユーザー ──────────────────────────────────────────
+    match /users/{userId} {
+      // 本人のみ読み書き（管理者は Cloud Functions 経由）
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ── 物件 ──────────────────────────────────────────────
+    match /properties/{propertyId} {
+      // 認証済みユーザーは閲覧可
+      allow read: if request.auth != null;
+      // 自分が登録した物件のみ更新可
+      allow create: if request.auth != null;
+      allow update: if request.auth != null &&
+        request.auth.uid == resource.data.submittedBy;
+      allow delete: if false; // 削除は管理者のみ（Cloud Functions）
+    }
+
+    // ── 商流確認 ──────────────────────────────────────────
+    match /flowVerifications/{propertyId} {
+      allow read: if request.auth != null;
+      allow write: if false; // サーバーサイドのみ
+    }
+
+    // ── 希望案件リクエスト ────────────────────────────────
+    match /requests/{requestId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null &&
+        request.auth.uid == resource.data.userId;
+    }
+
+    // ── 報酬記録 ──────────────────────────────────────────
+    match /rewards/{rewardId} {
+      // 自分に関係する報酬のみ閲覧
+      allow read: if request.auth != null &&
+        request.auth.uid == resource.data.userId;
+      allow write: if false; // サーバーサイドのみ
+    }
+  }
+}

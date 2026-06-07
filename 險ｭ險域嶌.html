@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>AIBO — システム設計書</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap');
+  :root{--bg:#0a0c10;--bg2:#111318;--bg3:#181c24;--border:#1e2530;--accent:#00e5a0;--accent2:#0077ff;--accent3:#ff6b35;--text:#e8edf5;--text2:#7a8599;--gold:#f0b429;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;padding:40px 20px;}
+  .container{max-width:960px;margin:0 auto;}
+  .logo{font-family:'Space Mono',monospace;font-size:36px;color:var(--accent);letter-spacing:6px;text-shadow:0 0 30px rgba(0,229,160,.4);}
+  .subtitle{color:var(--text2);font-size:14px;margin-top:4px;letter-spacing:2px;}
+  h1{font-size:22px;color:var(--accent);margin:48px 0 16px;padding-bottom:8px;border-bottom:1px solid var(--border);letter-spacing:2px;}
+  h2{font-size:16px;color:var(--text);margin:28px 0 12px;font-weight:700;}
+  h3{font-size:14px;color:var(--accent2);margin:20px 0 8px;}
+  p{color:var(--text2);font-size:14px;margin-bottom:12px;}
+  .card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:20px;margin:16px 0;}
+  .card.green{border-left:3px solid var(--accent);}
+  .card.blue{border-left:3px solid var(--accent2);}
+  .card.orange{border-left:3px solid var(--accent3);}
+  .card.gold{border-left:3px solid var(--gold);}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:16px 0;}
+  th{background:var(--bg3);color:var(--text2);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);font-family:'Space Mono';font-size:11px;letter-spacing:1px;}
+  td{padding:10px 14px;border-bottom:1px solid rgba(30,37,48,.5);color:var(--text2);}
+  td:first-child{color:var(--text);font-weight:500;}
+  tr:last-child td{border-bottom:none;}
+  code{font-family:'Space Mono';font-size:12px;background:var(--bg3);padding:2px 6px;border-radius:3px;color:var(--accent);}
+  pre{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:20px;overflow-x:auto;font-family:'Space Mono';font-size:12px;color:var(--accent);margin:12px 0;line-height:1.8;}
+  .flow-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin:20px 0;align-items:center;}
+  .flow-node{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px 8px;text-align:center;font-size:12px;}
+  .flow-node .role{font-size:10px;color:var(--text2);margin-bottom:4px;font-family:'Space Mono';}
+  .flow-node .name{font-weight:700;color:var(--text);}
+  .flow-arrow{text-align:center;color:var(--accent);font-size:20px;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;font-family:'Space Mono';}
+  .badge.green{background:rgba(0,229,160,.15);color:var(--accent);}
+  .badge.gold{background:rgba(240,180,41,.15);color:var(--gold);}
+  .badge.blue{background:rgba(0,119,255,.15);color:var(--accent2);}
+  ul{color:var(--text2);font-size:14px;padding-left:20px;}
+  ul li{margin-bottom:6px;}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media(max-width:600px){.two-col{grid-template-columns:1fr;}.flow-grid{grid-template-columns:1fr;}}
+  .divider{border:none;border-top:1px solid var(--border);margin:40px 0;}
+  .highlight{color:var(--accent);font-weight:700;}
+  .warn{color:var(--accent3);}
+  .page-break{page-break-before:always;}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div style="text-align:center;padding:40px 0 60px">
+    <div class="logo">AIBO</div>
+    <div class="subtitle">AI不動産管理システム — システム設計書 v1.0</div>
+    <div style="font-size:12px;color:var(--text2);margin-top:8px;font-family:'Space Mono'">2024年作成　CONFIDENTIAL</div>
+  </div>
+
+  <!-- ── 1. システム概要 ── -->
+  <h1>1. システム概要</h1>
+  <p>AIBOは、LINE・Web・アプリを統合したAI不動産ブローカー管理プラットフォームです。物件情報の受付から商流確認・報酬計算・契約完了まで、不動産取引のすべてをデジタルで完結させます。</p>
+
+  <div class="card green">
+    <h2>システム名: AIBO（AI不動産相棒）</h2>
+    <ul>
+      <li>LINE・PCどちらからでも物件情報を登録・閲覧できる</li>
+      <li>AIが概要書を読み取り、自動で物件データを構造化</li>
+      <li>商流をリレー式に確認し、売主まで追跡する</li>
+      <li>報酬を商流人数・プランに応じてリアルタイムに自動計算</li>
+      <li>Google Cloud / Firebase による世界展開対応</li>
+    </ul>
+  </div>
+
+  <!-- ── 2. アーキテクチャ ── -->
+  <h1>2. システムアーキテクチャ</h1>
+
+  <pre>
+  [LINEユーザー]                    [Webブラウザ/アプリ]
+       │                                    │
+       │ Webhook (HTTPS/POST)               │ HTTPS
+       ▼                                    ▼
+  ┌─────────────────────────────────────────────────────┐
+  │              Google Cloud Run                        │
+  │         AIBO Webhook Server (Node.js)                │
+  │                                                      │
+  │  ① LINE署名検証                                      │
+  │  ② イベントルーティング                               │
+  │  ③ OpenAI GPT-4o で物件情報を構造化                  │
+  │  ④ 商流チェーン管理                                  │
+  │  ⑤ 報酬計算エンジン                                  │
+  └──────────────────────────┬──────────────────────────┘
+                             │
+                             ▼
+              ┌──────────────────────────┐
+              │    Google Firestore      │
+              │  (NoSQL データベース)     │
+              │                          │
+              │  /users                  │
+              │  /properties             │
+              │  /flowVerifications      │
+              │  /requests               │
+              │  /rewards                │
+              └──────────────────────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              ▼              ▼              ▼
+         Firebase      Google Cloud    LINE Push
+          Hosting      Secret Manager  Message API
+       (管理画面Web)   (環境変数管理)  (通知送信)
+  </pre>
+
+  <h2>採用技術スタック</h2>
+  <table>
+    <tr><th>レイヤー</th><th>技術</th><th>選定理由</th></tr>
+    <tr><td>Webhookサーバー</td><td>Node.js + Express</td><td>LINEの公式SDKとの相性、軽量・高速</td></tr>
+    <tr><td>ホスティング</td><td>Google Cloud Run</td><td>HTTPS自動付与、サーバーレス、世界展開対応</td></tr>
+    <tr><td>データベース</td><td>Cloud Firestore</td><td>リアルタイム同期、スケーラブル、Googleクラウド指定</td></tr>
+    <tr><td>AI解析</td><td>OpenAI GPT-4o</td><td>日本語の不動産概要書の解析精度が高い</td></tr>
+    <tr><td>認証</td><td>Firebase Authentication</td><td>LINE/Google/メールログイン対応</td></tr>
+    <tr><td>管理画面</td><td>HTML/JS (Firebase Hosting)</td><td>軽量・即デプロイ可能</td></tr>
+    <tr><td>シークレット管理</td><td>Google Secret Manager</td><td>APIキーをコードに埋め込まない</td></tr>
+  </table>
+
+  <!-- ── 3. LINE Webhook 実装詳細 ── -->
+  <h1>3. LINE Webhook 実装詳細</h1>
+
+  <div class="card blue">
+    <h2>⚠️ MANUSで断念した問題の解決方法</h2>
+    <p>LINEのWebhookはインターネット公開済みのHTTPS URLが必須です。<span class="highlight">Google Cloud Runはデプロイと同時にHTTPS URLが自動発行</span>されるため、この問題を完全に解決します。</p>
+    <ul>
+      <li>HTTPS自動付与（LINEの要件を満たす）</li>
+      <li>LINE署名検証（<code>x-line-signature</code>）を実装済み</li>
+      <li>LINEへの200レスポンスを即時返却（タイムアウト防止）</li>
+      <li>イベント処理は非同期で実行</li>
+    </ul>
+  </div>
+
+  <h2>署名検証フロー</h2>
+  <pre>
+  LINE Platform
+      │
+      │ POST /webhook
+      │ Header: x-line-signature: [Base64(HMAC-SHA256(body, Channel Secret))]
+      │ Body: {"events": [...]}
+      ▼
+  server.js
+      │
+      ├─ req.rawBody を保持（express.json の verify オプション）
+      │
+      ├─ HMAC-SHA256(rawBody, LINE_CHANNEL_SECRET) を計算
+      │
+      ├─ crypto.timingSafeEqual() でタイミング攻撃を防いで比較
+      │
+      ├─ 一致 → 200 OK を即返却 → イベント非同期処理
+      └─ 不一致 → 401 Unauthorized
+  </pre>
+
+  <h2>メッセージ処理フロー（状態マシン）</h2>
+  <table>
+    <tr><th>ユーザー状態 (state)</th><th>受信内容</th><th>処理</th></tr>
+    <tr><td><code>default</code></td><td>「物件登録」または「1」</td><td>状態を<code>awaiting_property_text</code>に変更</td></tr>
+    <tr><td><code>awaiting_property_text</code></td><td>テキストメッセージ</td><td>GPT-4oで解析 → Firestoreに保存 → 商流確認開始</td></tr>
+    <tr><td><code>awaiting_property_text</code></td><td>画像</td><td>LINE Content APIで取得 → OCR → GPT-4o解析</td></tr>
+    <tr><td><code>awaiting_request_text</code></td><td>テキストメッセージ</td><td>希望案件として保存 → 全会員にブロードキャスト</td></tr>
+    <tr><td><code>default</code></td><td>その他</td><td>メインメニューFlexメッセージを表示</td></tr>
+  </table>
+
+  <!-- ── 4. 商流確認システム ── -->
+  <h1>4. 商流確認システム</h1>
+  <p>不動産情報がどのように流通してきたかを、リレー式に自動追跡します。</p>
+
+  <div class="flow-grid">
+    <div class="flow-node"><div class="role">SELLER</div><div class="name">売主</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="role">AGENT</div><div class="name">元付け</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node" style="border-color:var(--gold)"><div class="role">AIBO</div><div class="name" style="color:var(--gold)">当社</div></div>
+  </div>
+  <div class="flow-grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:0">
+    <div></div>
+    <div class="flow-arrow" style="font-size:16px">↑ 商流コードでリレー</div>
+    <div></div>
+  </div>
+  <div class="flow-grid" style="margin-top:0">
+    <div class="flow-node"><div class="role">BUYER</div><div class="name">買主</div></div>
+    <div class="flow-arrow">←</div>
+    <div class="flow-node"><div class="role">BROKER-B</div><div class="name">紹介者B</div></div>
+    <div class="flow-arrow">←</div>
+    <div class="flow-node"><div class="role">BROKER-A</div><div class="name">紹介者A</div></div>
+  </div>
+
+  <h2>商流確認アルゴリズム</h2>
+  <pre>
+  1. AさんがLINEで物件情報を送信
+
+  2. サーバーが物件をFirestoreに保存し、商流コード（例: AB34XK）を発行
+
+  3. Aさんにメッセージ:
+     「あなたに情報をくれた方にこのコードを共有してください: AB34XK」
+
+  4. BさんがLINEで「AB34XK」を入力
+
+  5. サーバーがBさんにメッセージ:
+     「この物件情報をAさんに渡しましたか？」
+     → YES の場合 → Bさんを商流チェーンに追加
+     → 新しいコードを発行してBさんの紹介元へ繰り返す
+
+  6. 売主に到達したら:
+     → 本人確認書類をLINEで受領
+     → 商流確認完了フラグをFirestoreに保存
+     → AIBOから売主に挨拶メッセージを送信
+     → 管理者に通知
+
+  Firestore 保存形式:
+  flowVerifications/{propertyId}
+  {
+    chain: [
+      { userId: "U111", role: "broker",  verifiedAt: Timestamp },
+      { userId: "U222", role: "agent",   verifiedAt: Timestamp },
+      { userId: "U333", role: "seller",  verifiedAt: Timestamp }
+    ],
+    status: "reached_seller"
+  }
+  </pre>
+
+  <!-- ── 5. 報酬計算エンジン ── -->
+  <h1>5. 報酬計算エンジン</h1>
+
+  <div class="two-col">
+    <div class="card green">
+      <h3>計算ロジック（売主側）</h3>
+      <pre style="margin:8px 0;font-size:11px">
+物件価格 × 1.5%
+= 売主側手数料
+
+  うち 0.5% = 紹介者プール
+  うち 1.0% = AIBO取り分
+
+紹介者プール ÷ 紹介者数
+= 各紹介者の報酬
+
+PRO会員の場合: +0.1%加算
+月5件以上の場合: さらに+0.1%加算
+      </pre>
+    </div>
+    <div class="card gold">
+      <h3>計算例（¥3.2億の物件・紹介者2名）</h3>
+      <pre style="margin:8px 0;font-size:11px">
+物件価格: ¥320,000,000
+売主手数料(1.5%): ¥4,800,000
+
+  紹介者プール(0.5%): ¥1,600,000
+    紹介者A(FREE): ¥800,000
+    紹介者B(PRO): ¥800,000
+                  + ¥320,000
+                  = ¥1,120,000
+
+  AIBO取り分(1.0%): ¥3,200,000
+      </pre>
+    </div>
+  </div>
+
+  <!-- ── 6. 会員プラン ── -->
+  <h1>6. 会員プラン設計</h1>
+  <table>
+    <tr><th>機能</th><th><span class="badge green">FREE</span></th><th><span class="badge gold">PRO ¥3,300/月</span></th></tr>
+    <tr><td>物件登録・閲覧</td><td>✅ 無制限</td><td>✅ 無制限</td></tr>
+    <tr><td>希望案件リクエスト</td><td>✅ 月3件</td><td>✅ 無制限</td></tr>
+    <tr><td>商流確認システム</td><td>✅</td><td>✅</td></tr>
+    <tr><td>紹介報酬受取</td><td>✅ 0.5%を分配</td><td>✅ +0.1%加算</td></tr>
+    <tr><td>多案件特典</td><td>❌</td><td>✅ 月5件以上+0.1%</td></tr>
+    <tr><td>優先掲載</td><td>❌</td><td>✅</td></tr>
+    <tr><td>商流図エクスポート</td><td>❌</td><td>✅ Excel/PDF</td></tr>
+    <tr><td>詳細分析レポート</td><td>❌</td><td>✅</td></tr>
+    <tr><td>API連携</td><td>❌</td><td>✅</td></tr>
+  </table>
+
+  <!-- ── 7. セキュリティ ── -->
+  <h1>7. セキュリティ設計</h1>
+  <div class="two-col">
+    <div class="card orange">
+      <h3>実装済みのセキュリティ</h3>
+      <ul>
+        <li>LINE署名検証（HMAC-SHA256）</li>
+        <li>タイミング攻撃対策（<code>timingSafeEqual</code>）</li>
+        <li>APIキーはSecret Managerで管理</li>
+        <li>Dockerコンテナは非rootユーザーで実行</li>
+        <li>Firestoreセキュリティルールで認証済みユーザーのみアクセス</li>
+        <li>HTTPS通信のみ（Cloud Run自動対応）</li>
+      </ul>
+    </div>
+    <div class="card blue">
+      <h3>個人情報の取り扱い</h3>
+      <ul>
+        <li>身分証明書は暗号化してCloud Storageに保存</li>
+        <li>口座情報は別途暗号化DB（AES-256）</li>
+        <li>商流図は名前を表示せず役割のみ</li>
+        <li>GDPR・個人情報保護法に準拠した設計</li>
+        <li>管理者のみがPII（個人情報）にアクセス可能</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ── 8. 開発ロードマップ ── -->
+  <h1>8. 開発ロードマップ</h1>
+  <table>
+    <tr><th>フェーズ</th><th>内容</th><th>期間</th><th>状態</th></tr>
+    <tr>
+      <td>Phase 1</td>
+      <td>LINE Webhook + Cloud Run + Firestore基盤構築</td>
+      <td>2〜3週間</td>
+      <td><span class="badge green">設計完了</span></td>
+    </tr>
+    <tr>
+      <td>Phase 2</td>
+      <td>物件登録フォーム（Web）+ AI概要書解析</td>
+      <td>2〜3週間</td>
+      <td><span class="badge blue">次フェーズ</span></td>
+    </tr>
+    <tr>
+      <td>Phase 3</td>
+      <td>商流リレーコード + 自動確認メッセージ</td>
+      <td>3〜4週間</td>
+      <td>予定</td>
+    </tr>
+    <tr>
+      <td>Phase 4</td>
+      <td>報酬自動計算 + 会員管理 + PRO課金</td>
+      <td>2〜3週間</td>
+      <td>予定</td>
+    </tr>
+    <tr>
+      <td>Phase 5</td>
+      <td>Excel/PDF出力 + モバイルアプリ（PWA）</td>
+      <td>3〜4週間</td>
+      <td>予定</td>
+    </tr>
+    <tr>
+      <td>Phase 6</td>
+      <td>多言語対応（英語・中国語）+ 海外展開</td>
+      <td>4〜6週間</td>
+      <td>将来</td>
+    </tr>
+  </table>
+
+  <!-- ── 9. 月額費用 ── -->
+  <h1>9. 運用コスト試算</h1>
+  <table>
+    <tr><th>サービス</th><th>無料枠</th><th>100会員・月100物件規模</th></tr>
+    <tr><td>Google Cloud Run</td><td>200万リクエスト/月</td><td>無料枠内</td></tr>
+    <tr><td>Cloud Firestore</td><td>50,000読取/日</td><td>¥500〜¥2,000</td></tr>
+    <tr><td>LINE Messaging API</td><td>200通/月（無料）</td><td>¥1,000〜¥3,000</td></tr>
+    <tr><td>OpenAI GPT-4o</td><td>なし</td><td>¥500〜¥1,500</td></tr>
+    <tr><td>Firebase Hosting</td><td>10GB/月</td><td>無料枠内</td></tr>
+    <tr><td><strong>合計</strong></td><td></td><td><strong>¥2,000〜¥6,500/月</strong></td></tr>
+  </table>
+  <p>PRO会員65名 × ¥3,300 = <span class="highlight">¥214,500/月の収益</span>でシステム費用を大きくカバーできます。</p>
+
+  <hr class="divider">
+  <div style="text-align:center;color:var(--text2);font-size:12px;font-family:'Space Mono';padding-bottom:40px">
+    AIBO AI不動産管理システム 設計書 v1.0 — CONFIDENTIAL
+  </div>
+
+</div>
+</body>
+</html>
