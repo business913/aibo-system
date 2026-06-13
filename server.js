@@ -166,7 +166,7 @@ async function handleAudioMessage(userId, messageId) {
       return await lineReply(userId, [{ type: 'text', text: '音声が聞き取れませんでした。' }]);
     }
     await lineReply(userId, [{ type: 'text', text: `📝 認識結果:\n"${transcript}"\n\n解析します…` }]);
-    await parsePropertyText(userId, transcript);
+    await parsePropertyText(userId, transcript.slice(0, 3000));
   } catch (err) {
     console.error('音声解析エラー:', err.response?.data || err.message);
     await lineReply(userId, [{ type: 'text', text: '音声の処理に失敗しました。テキストでお送りください。' }]);
