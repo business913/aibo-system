@@ -274,7 +274,8 @@ async function extractPropertyDataWithAI(text) {
       {
         model: 'claude-sonnet-4-6',
         max_tokens: 1024,
-        messages: [{ role: 'user', content: buildPropertyExtractionPrompt() + '\n\n' + text }]
+        system: buildPropertyExtractionPrompt(),
+        messages: [{ role: 'user', content: text }]
       },
       {
         headers: {
