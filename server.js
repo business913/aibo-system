@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 8080;
 
 const LINE_CHANNEL_SECRET       = process.env.LINE_CHANNEL_SECRET;
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 if (process.env.FIREBASE_SERVICE_ACCOUNT) { const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT); admin.initializeApp({ credential: admin.credential.cert(serviceAccount) }); } else { admin.initializeApp({ credential: admin.credential.applicationDefault() }); }
 const db = admin.firestore();
@@ -270,17 +270,24 @@ async function parsePropertyText(userId, text) {
 async function extractPropertyDataWithAI(text) {
   try {
     const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      'https://api.anthropic.com/v1/messages',
       {
-        contents: [{ parts: [{ text: buildPropertyExtractionPrompt() + '\n\n' + text }] }],
-        generationConfig: { responseMimeType: 'application/json' }
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: buildPropertyExtractionPrompt() + '\n\n' + text }]
+      },
+      {
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json'
+        }
       }
     );
-    const content = response.data.candidates[0].content.parts[0].text;
+    const content = response.data.content[0].text;
     return JSON.parse(content);
   } catch (err) {
-    console.error('Gemini APIエラー詳細:', JSON.stringify(err.response?.data, null, 2));
-    console.error('ステータス:', err.response?.status);
+    console.error('Claude APIエラー詳細:', JSON.stringify(err.response?.data, null, 2));
     throw err;
   }
 }
