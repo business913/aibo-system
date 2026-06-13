@@ -174,8 +174,43 @@ async function handleAudioMessage(userId, messageId) {
 }
 
 async function handlePropertyFile(userId, messageId, fileName) {
-  await lineReply(userId, [{ type: 'text', text: `📄 「${fileName}」を受け取りました。\nテキストで物件情報を貼り付けていただけますか？` }]);
-  await db.collection('users').doc(userId).set({ state: 'awaiting_property_text' }, { merge: true });
+  const isPdf = fileName?.toLowerCase().endsWith('.pdf');
+  if (!isPdf) {
+    await lineReply(userId, [{ type: 'text', text: `📄 「${fileName}」を受け取りました。\nテキストで物件情報を貼り付けていただけますか？` }]);
+    await db.collection('users').doc(userId).set({ state: 'awaiting_property_text' }, { merge: true });
+    return;
+  }
+  await lineReply(userId, [{ type: 'text', text: `📄 「${fileName}」を解析中です…` }]);
+  try {
+    const fileRes = await axios.get(
+      `https://api-data.line.me/v2/bot/message/${messageId}/content`,
+      { headers: { Authorization: `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}` }, responseType: 'arraybuffer' }
+    );
+    const base64Pdf = Buffer.from(fileRes.data).toString('base64');
+    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+      model: 'gpt-4o',
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: buildPropertyExtractionPrompt() },
+        { role: 'user', content: [
+          { type: 'text', text: 'この概要書PDFから物件情報を抽出してください。' },
+          { type: 'image_url', image_url: { url: `data:application/pdf;base64,${base64Pdf}` } }
+        ]}
+      ]
+    }, { headers: { Authorization: `Bearer ${OPENAI_API_KEY}` } });
+    const parsed = JSON.parse(response.data.choices[0].message.content);
+    const ref = await db.collection('properties').add({
+      ...parsed, submittedBy: userId, inputType: 'pdf',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(), status: 'draft',
+    });
+    await db.collection('users').doc(userId).set({ state: 'default' }, { merge: true });
+    await startFlowVerification(userId, ref.id, parsed.propertyName || '無題物件');
+    await lineReply(userId, [{ type: 'flex', altText: '物件登録完了', contents: buildPropertyConfirmCard(parsed, ref.id) }]);
+  } catch (err) {
+    console.error('PDF解析エラー:', err.response?.data || err.message);
+    await lineReply(userId, [{ type: 'text', text: 'PDFの解析に失敗しました。テキストで送ってください。' }]);
+    await db.collection('users').doc(userId).set({ state: 'awaiting_property_text' }, { merge: true });
+  }
 }
 
 async function handleFlowCode(userId, code) {
