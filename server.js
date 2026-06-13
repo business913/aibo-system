@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 8080;
 
 const LINE_CHANNEL_SECRET       = process.env.LINE_CHANNEL_SECRET;
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-const OPENAI_API_KEY            = process.env.OPENAI_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 if (process.env.FIREBASE_SERVICE_ACCOUNT) { const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT); admin.initializeApp({ credential: admin.credential.cert(serviceAccount) }); } else { admin.initializeApp({ credential: admin.credential.applicationDefault() }); }
 const db = admin.firestore();
@@ -122,17 +122,19 @@ async function handlePropertyImage(userId, messageId) {
     );
     const base64Image = Buffer.from(imageRes.data).toString('base64');
     const mimeType = imageRes.headers['content-type'] || 'image/jpeg';
-    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-      model: 'gpt-4o', response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: buildPropertyExtractionPrompt() },
-        { role: 'user', content: [
-          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}` } },
-          { type: 'text', text: 'この画像から物件情報を抽出してください。' }
-        ]}
-      ]
-    }, { headers: { Authorization: `Bearer ${OPENAI_API_KEY}` } });
-    const parsed = JSON.parse(response.data.choices[0].message.content);
+
+const response = await axios.post(
+  `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+  {
+    contents: [{ parts: [
+      { text: buildPropertyExtractionPrompt() },
+      { inline_data: { mime_type: mimeType, data: base64Image } }
+    ]}],
+    generationConfig: { responseMimeType: 'application/json' }
+  }
+);
+const content = response.data.candidates[0].content.parts[0].text;
+const parsed = JSON.parse(content);
     const ref = await db.collection('properties').add({
       ...parsed, submittedBy: userId, inputType: 'image',
       createdAt: admin.firestore.FieldValue.serverTimestamp(), status: 'draft',
@@ -266,14 +268,15 @@ async function parsePropertyText(userId, text) {
 }
 
 async function extractPropertyDataWithAI(text) {
-  const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-    model: 'gpt-4o', response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: buildPropertyExtractionPrompt() },
-      { role: 'user', content: text }
-    ]
-  }, { headers: { Authorization: `Bearer ${OPENAI_API_KEY}` } });
-  return JSON.parse(response.data.choices[0].message.content);
+  const response = await axios.post(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      contents: [{ parts: [{ text: buildPropertyExtractionPrompt() + '\n\n' + text }] }],
+      generationConfig: { responseMimeType: 'application/json' }
+    }
+  );
+  const content = response.data.candidates[0].content.parts[0].text;
+  return JSON.parse(content);
 }
 
 function buildPropertyExtractionPrompt() {
