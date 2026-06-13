@@ -268,17 +268,22 @@ async function parsePropertyText(userId, text) {
 }
 
 async function extractPropertyDataWithAI(text) {
-  const response = await axios.post(
+  try {
+    const response = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         contents: [{ parts: [{ text: buildPropertyExtractionPrompt() + '\n\n' + text }] }],
         generationConfig: { responseMimeType: 'application/json' }
       }
     );
-  const content = response.data.candidates[0].content.parts[0].text;
-  return JSON.parse(content);
+    const content = response.data.candidates[0].content.parts[0].text;
+    return JSON.parse(content);
+  } catch (err) {
+    console.error('Gemini APIエラー詳細:', JSON.stringify(err.response?.data, null, 2));
+    console.error('ステータス:', err.response?.status);
+    throw err;
+  }
 }
-
 function buildPropertyExtractionPrompt() {
   return `あなたは不動産の専門家です。送られたテキストまたは画像から物件情報を抽出し、以下のJSON形式で返してください。値が不明な場合はnullを使用してください。
 {"propertyName":"物件名","propertyType":"種別","address":"所在地","price":価格,"area":面積,"buildYear":築年,"structure":"構造","floors":階数,"landArea":土地面積,"currentUse":"現況","zoning":"用途地域","coverage":建蔽率,"floorRatio":容積率,"yieldRate":利回り,"monthlyRent":月額賃料,"remarks":"備考","merits":["メリット"],"demerits":["デメリット"],"risks":["リスク"]}`;
