@@ -269,12 +269,12 @@ async function parsePropertyText(userId, text) {
 
 async function extractPropertyDataWithAI(text) {
   const response = await axios.post(
-    https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`
-    {
-      contents: [{ parts: [{ text: buildPropertyExtractionPrompt() + '\n\n' + text }] }],
-      generationConfig: { responseMimeType: 'application/json' }
-    }
-  );
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        contents: [{ parts: [{ text: buildPropertyExtractionPrompt() + '\n\n' + text }] }],
+        generationConfig: { responseMimeType: 'application/json' }
+      }
+    );
   const content = response.data.candidates[0].content.parts[0].text;
   return JSON.parse(content);
 }
