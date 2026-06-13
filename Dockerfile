@@ -2,7 +2,7 @@
 FROM node:20-slim AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN nnpm install --only=production
+RUN npm install --only=production
 
 # ── 実行ステージ ──────────────────────────────────────────
 FROM node:20-slim
